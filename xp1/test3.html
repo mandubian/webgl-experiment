@@ -1,0 +1,551 @@
+<html>
+<head>
+
+<script src="gl-matrix.js"></script>
+
+<script>
+
+
+function v3(x, y, z) { return vec3.fromValues(x, y, z) };
+
+(function(){
+  var Lprefix = "Glsl: ";
+  function log (msg) {
+    console.log && console.log(Lprefix+msg);
+  }
+  function warn (msg) {
+    if (console.warn) console.warn(Lprefix+msg);
+    else log("WARN "+msg);
+  }
+  function error (msg) {
+    if (console.error) console.error(Lprefix+msg);
+    else log("ERR "+msg);
+  }
+
+  this.WebGL = function(options){
+    if ( !(this instanceof arguments.callee) ) return new arguments.callee(options);
+
+    this.canvasId = options.canvas;
+    this.vertexShaderId = options.vertexShader;
+    this.fragmentShaderId = options.fragmentShader;
+    this.vertexPositionAttributeName = options.vertexPositionAttributeName || "a_vertexPosition";
+    this.vertexColorAttributeName = options.vertexColorAttributeName || "a_vertexColor";
+
+    this.update = options.update || function(t){};
+
+    this.initGL();
+    this.initShaders();
+    this.initProgram();
+    this.initUniforms();
+    this.initObjects();
+    this.initBuffers();
+    this.render();
+
+  }; 
+
+  WebGL.supported = function () {
+    return !!getWebGLContext(document.createElement("canvas"));
+  };
+
+  WebGL.prototype = {
+    initGL: function() {
+      this.canvas = document.getElementById(this.canvasId);  
+      this.gl = (canvas.getContext("webgl")) ? canvas.getContext("webgl") : canvas.getContext("experimental-webgl");  
+      this.gl.clearColor(1.0, 0.0, 0.0, 1.0); // this is the color  
+      this.gl.enable(this.gl.DEPTH_TEST); //Enable Depth Testing  
+      this.gl.depthFunc(this.gl.LEQUAL); //Set Perspective View  
+      this.aspectRatio = canvas.width / canvas.height;
+      var w = this.canvas.width, h = this.canvas.height;
+      this.gl.viewport(0, 0, w, h);
+    },
+
+    initShaders: function() {
+      this.vertexShader = GLUtils.loadShaderFromId(this.gl, this.vertexShaderId, this.gl.VERTEX_SHADER);
+      this.fragmentShader = GLUtils.loadShaderFromId(this.gl, this.fragmentShaderId, this.gl.FRAGMENT_SHADER);
+    },
+    
+    initProgram: function() {
+      this.program = GLUtils.loadProgram(this.gl, [this.vertexShader, this.fragmentShader]);
+      this.gl.useProgram(this.program);
+    },
+    
+    initUniforms: function() {      
+      this.vertexPositionAttribute = this.gl.getAttribLocation(this.program, this.vertexPositionAttributeName);  
+      this.gl.enableVertexAttribArray(this.vertexPositionAttribute);  
+
+      this.vertexColorAttribute = this.gl.getAttribLocation(this.program, this.vertexColorAttributeName);  
+      this.gl.enableVertexAttribArray(this.vertexColorAttribute);  
+
+      //this.texCoordAttribute = this.gl.getAttribLocation(this.program, "a_texCoord");
+      //this.gl.enableVertexAttribArray(this.texCoordAttribute);
+    },
+
+    initObjects: function() {
+      this.cubes = [];
+      var nbPerRow = 18;
+      this.nbCubes = nbPerRow*nbPerRow*nbPerRow;
+      
+      for(var i=0; i<nbPerRow; i++){
+        for(var j=0; j<nbPerRow; j++){
+          for(var k=0; k<nbPerRow; k++){
+            this.cubes.push( new Cube({
+              position: [0.65*k, 0.65*j, 0.65*i],
+              scale: [0.2, 0.2, 0.2]
+            }));
+          }
+        }
+      }
+
+    },
+
+    initBuffers: function() {
+
+      var vertices = [];
+      var colors = [];
+      var triangles = new Uint16Array(this.cubes[0].triangles.length * this.nbCubes);
+      for(var i = 0; i<this.nbCubes; i++){
+        var cube = this.cubes[i];
+        vertices = vertices.concat(cube.vertices);
+        colors = colors.concat(cube.colors);
+        
+        var tri = new Uint16Array(cube.triangles.length);
+        for(var j = 0; j<cube.triangles.length; j++){
+          tri[j] = cube.triangles[j] + i*24;  
+        }
+        triangles.set(tri, i*cube.triangles.length);
+      }
+
+      var vertexBuffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STATIC_DRAW);
+      this.gl.vertexAttribPointer(this.vertexPositionAttribute, 3, this.gl.FLOAT, false, 0, 0);  
+       
+      var colorBuffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, colorBuffer);
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
+      colorBuffer.itemSize = 4;
+      colorBuffer.numItems = 24 * this.nbCubes;
+      this.gl.vertexAttribPointer(this.vertexColorAttribute, colorBuffer.itemSize, this.gl.FLOAT, false, 0, 0);
+
+      var triangleBuffer = this.gl.createBuffer();  
+      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, triangleBuffer);  
+      this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangles), this.gl.STATIC_DRAW);  
+    },
+
+    render: function () {
+      var perspectiveMatrix = GLUtils.makePerspective(45, this.aspectRatio, 1, 10000.0);  
+      var transformMatrix = GLUtils.makeTransform(cube);  
+      var pmatrix = this.gl.getUniformLocation(this.program, "u_perspectiveMatrix");  
+      this.gl.uniformMatrix4fv(pmatrix, false, new Float32Array(perspectiveMatrix));  
+      var tmatrix = this.gl.getUniformLocation(this.program, "u_transformationMatrix");  
+      this.gl.uniformMatrix4fv(tmatrix, false, new Float32Array(transformMatrix));
+
+      //this.buildCubeBuffer(this.cube);  
+
+      this.gl.drawElements(this.gl.TRIANGLES, this.cubes[0].triangles.length * this.nbCubes, this.gl.UNSIGNED_SHORT, 0);  
+    },
+
+    start: function () {
+      var startTime = Date.now();
+      var lastTime = startTime;
+      var self = this;
+      this.running = true;
+      requestAnimationFrame(function loop () {
+        if (this.stopRequest) { // handle stop request
+          this.stopRequest = false;
+          this.running = false;
+          return;
+        }
+        requestAnimationFrame(loop, self.canvas);
+        var t = Date.now()-startTime;
+        var delta = t-lastTime;
+        lastTime = t;
+        self.update(t, delta);
+        self.render();
+      }, self.canvas);
+      return this;
+    },
+
+    /**
+     * Stops the render and update loop.
+     * @public
+     */
+    stop: function () {
+      this.stopRequest = true;
+    },
+
+
+    buildCubeBuffer: function(cube) {
+      var vertexBuffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(cube.vertices), this.gl.STATIC_DRAW);
+      this.gl.vertexAttribPointer(this.vertexPositionAttribute, 3, this.gl.FLOAT, false, 0, 0);  
+       
+      var colorBuffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, colorBuffer);
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(cube.colors), this.gl.STATIC_DRAW);
+      colorBuffer.itemSize = 4;
+      colorBuffer.numItems = 24;
+      this.gl.vertexAttribPointer(this.vertexColorAttribute, colorBuffer.itemSize, this.gl.FLOAT, false, 0, 0);
+
+      var triangleBuffer = this.gl.createBuffer();  
+      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, triangleBuffer);  
+      this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(cube.triangles), this.gl.STATIC_DRAW);  
+    }
+  }
+
+  this.Cube = function(options){
+    if ( !(this instanceof arguments.callee) ) return new arguments.callee(options);
+    /*this.width = options.width;
+    this.height = options.height;
+    this.depth = options.depth;*/
+
+    this.position = options.position || [0.0, 0.0, 0.0];
+    this.rotation = options.rotation;
+    this.scale = options.scale || [1.0, 1.0, 1.0];
+
+    this.vertices  = [
+      //front face
+      -1.0, -1.0,  1.0,
+       1.0, -1.0,  1.0,
+       1.0,  1.0,  1.0,
+      -1.0,  1.0,  1.0,
+      // back face
+      -1.0, -1.0, -1.0,
+      -1.0,  1.0, -1.0,
+       1.0,  1.0, -1.0,
+       1.0, -1.0, -1.0,
+      // Top face
+      -1.0,  1.0, -1.0,
+      -1.0,  1.0,  1.0,
+       1.0,  1.0,  1.0,
+       1.0,  1.0, -1.0,
+       
+      // Bottom face
+      -1.0, -1.0, -1.0,
+       1.0, -1.0, -1.0,
+       1.0, -1.0,  1.0,
+      -1.0, -1.0,  1.0,
+       
+      // Right face
+       1.0, -1.0, -1.0,
+       1.0,  1.0, -1.0,
+       1.0,  1.0,  1.0,
+       1.0, -1.0,  1.0,
+       
+      // Left face
+      -1.0, -1.0, -1.0,
+      -1.0, -1.0,  1.0,
+      -1.0,  1.0,  1.0,
+      -1.0,  1.0, -1.0
+    ];
+
+    this.triangles = [
+      0,  1,  2,      0,  2,  3,    // front
+      4,  5,  6,      4,  6,  7,    // back
+      8,  9,  10,     8,  10, 11,   // top
+      12, 13, 14,     12, 14, 15,   // bottom
+      16, 17, 18,     16, 18, 19,   // right
+      20, 21, 22,     20, 22, 23    // left
+    ];
+
+    this.colors = [
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0
+    ];
+
+    this.matrix = mat4.create();
+    mat4.translate(this.matrix, this.matrix, this.position);
+    mat4.scale(this.matrix, this.matrix, this.scale);
+
+    vec3.forEach(this.vertices, 0, 0, 0, function(v, w, matrix){
+      vec3.transformMat4(v, v, matrix);
+    }, this.matrix);
+  }
+
+  var cube = {
+    rotation: 0.0,
+    vertices : [
+      // Front face
+      -1.0, -1.0,  1.0,
+       1.0, -1.0,  1.0,
+       1.0,  1.0,  1.0,
+      -1.0,  1.0,  1.0,
+       
+      // Back face
+      -1.0, -1.0, -1.0,
+      -1.0,  1.0, -1.0,
+       1.0,  1.0, -1.0,
+       1.0, -1.0, -1.0,
+       
+      // Top face
+      -1.0,  1.0, -1.0,
+      -1.0,  1.0,  1.0,
+       1.0,  1.0,  1.0,
+       1.0,  1.0, -1.0,
+       
+      // Bottom face
+      -1.0, -1.0, -1.0,
+       1.0, -1.0, -1.0,
+       1.0, -1.0,  1.0,
+      -1.0, -1.0,  1.0,
+       
+      // Right face
+       1.0, -1.0, -1.0,
+       1.0,  1.0, -1.0,
+       1.0,  1.0,  1.0,
+       1.0, -1.0,  1.0,
+       
+      // Left face
+      -1.0, -1.0, -1.0,
+      -1.0, -1.0,  1.0,
+      -1.0,  1.0,  1.0,
+      -1.0,  1.0, -1.0
+    ],
+
+    triangles : [
+      0,  1,  2,      0,  2,  3,    // front
+      4,  5,  6,      4,  6,  7,    // back
+      8,  9,  10,     8,  10, 11,   // top
+      12, 13, 14,     12, 14, 15,   // bottom
+      16, 17, 18,     16, 18, 19,   // right
+      20, 21, 22,     20, 22, 23    // left
+    ],
+
+    colors: [
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0
+    ]
+
+  };
+
+  var GLUtils = {
+    loadProgram: function(gl, shaders) {
+      var program = gl.createProgram();
+      shaders.forEach(function (shader) {
+        gl.attachShader(program, shader);
+      });
+      gl.linkProgram(program);
+
+      var linked = gl.getProgramParameter(program, gl.LINK_STATUS);
+      if (!linked) {
+        gl.deleteProgram(program);
+        throw new Error(program+" "+gl.getProgramInfoLog(program));
+      }
+      return program;
+    },
+
+    loadShaderFromId: function(gl, id, shaderType) {
+      return GLUtils.loadShader(gl, document.getElementById(id).innerHTML, shaderType);
+    },
+
+    loadShader: function(gl, shaderSource, shaderType) {
+      var shader = gl.createShader(shaderType);
+      gl.shaderSource(shader, shaderSource);
+      gl.compileShader(shader);
+      var compiled = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+      if (!compiled) {
+        lastError = gl.getShaderInfoLog(shader);
+        var split = lastError.split(":");
+        var col = parseInt(split[1], 10);
+        var line = parseInt(split[2], 10);
+        var s = "";
+        if (!isNaN(col)) {
+          var spaces = ""; for (var i=0; i<col; ++i) spaces+=" ";
+          s = "\n"+spaces+"^";
+        }
+        error(lastError+"\n"+shaderSource.split("\n")[line-1]+s);
+        gl.deleteShader(shader);
+        throw new Error(shader+" "+lastError);
+      }
+      return shader;
+    },
+
+    makePerspective: function(fov, aspectRatio, closest, farest){
+      var YLimit = closest * Math.tan(fov * Math.PI / 360);
+      var A = -( farest + closest ) / ( farest - closest );
+      var B = -2 * farest * closest / ( farest - closest );
+      var C = (2 * closest) / ( (YLimit * aspectRatio) * 2 );
+      var D = (2 * closest) / ( YLimit * 2 );
+      return [
+        C, 0, 0, 0,
+        0, D, 0, 0,
+        0, 0, A, -1,
+        0, 0, B, 0
+      ];
+    },
+
+    makeTransform: function(object){
+      var y = object.rotation * (Math.PI / 180.0);
+      var A = Math.cos(y);
+      var B = -1 * Math.sin(y);
+      var C = Math.sin(y);
+      var D = Math.cos(y);
+      object.rotation += .3;
+      return [
+        A, 0, B, 0,
+        0, 1, 0, 0,
+        C, 0, D, 0,
+        0, 0, -25, 1
+      ];
+    }
+  }
+
+  function getWebGLContext(canvas) {
+    if (!canvas.getContext) return;
+    var names = ["webgl", "experimental-webgl"];
+    for (var i = 0; i < names.length; ++i) {
+      try {
+        var ctx = canvas.getContext(names[i]);
+        if (ctx) return ctx;
+      } catch(e) {}
+    }
+  }
+
+  // http://paulirish.com/2011/requestanimationframe-for-smart-animating/
+  // http://my.opera.com/emoller/blog/2011/12/20/requestanimationframe-for-smart-er-animating
+
+  // requestAnimationFrame polyfill by Erik Möller
+  // fixes from Paul Irish and Tino Zijdel
+
+  (function() {
+      var lastTime = 0;
+      var vendors = ['ms', 'moz', 'webkit', 'o'];
+      for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
+          window.requestAnimationFrame = window[vendors[x]+'RequestAnimationFrame'];
+          window.cancelAnimationFrame = window[vendors[x]+'CancelAnimationFrame'] 
+                                     || window[vendors[x]+'CancelRequestAnimationFrame'];
+      }
+   
+      if (!window.requestAnimationFrame)
+          window.requestAnimationFrame = function(callback, element) {
+              var currTime = new Date().getTime();
+              var timeToCall = Math.max(0, 16 - (currTime - lastTime));
+              var id = window.setTimeout(function() { callback(currTime + timeToCall); }, 
+                timeToCall);
+              lastTime = currTime + timeToCall;
+              return id;
+          };
+   
+      if (!window.cancelAnimationFrame)
+          window.cancelAnimationFrame = function(id) {
+              clearTimeout(id);
+          };
+  }());
+}());
+
+var gl;
+
+function onLoad() {
+  gl = WebGL({
+    canvas : 'canvas', 
+    vertexShader : 'vertex-shader', 
+    fragmentShader : 'fragment-shader',
+    update : function(t) {
+      var gl = this.gl;
+      this.gl.uniform1f(
+        this.gl.getUniformLocation(this.program, "u_time"), 
+        t
+      );
+
+    }
+  }).start();
+}
+
+</script>
+
+
+</head>
+<body onload="onLoad();">
+
+<canvas id="canvas" style="border: none;" width="600" height="600"></canvas>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+  attribute highp vec3 a_vertexPosition;  
+  //attribute highp vec2 a_textureCoord; 
+
+  attribute vec4 a_vertexColor;
+
+  uniform highp mat4 u_transformationMatrix;  
+  uniform highp mat4 u_perspectiveMatrix;  
+  //varying highp vec2 v_textureCoord;  
+
+  varying vec4 v_vertexColor;
+
+  void main() {  
+    gl_Position = u_perspectiveMatrix * u_transformationMatrix * vec4(a_vertexPosition, 1.0);  
+    //v_textureCoord = a_textureCoord;  
+    v_vertexColor = a_vertexColor;
+  }  
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+  //varying highp vec2 v_textureCoord;  
+  //uniform sampler2D u_sampler;  
+  precision mediump float;
+
+  varying vec4 v_vertexColor;
+
+  void main() {  
+    //highp vec4 texelColor = texture2D(u_sampler, vec2(v_textureCoord.s, v_textureCoord.t));  
+    //gl_FragColor = texelColor;  
+    gl_FragColor = v_vertexColor;
+  } 
+</script>
+
+</body>
+</html>

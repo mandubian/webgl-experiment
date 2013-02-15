@@ -1,0 +1,286 @@
+<html>
+<head>
+
+<script>
+  
+(function(){
+  var Lprefix = "Glsl: ";
+  function log (msg) {
+    console.log && console.log(Lprefix+msg);
+  }
+  function warn (msg) {
+    if (console.warn) console.warn(Lprefix+msg);
+    else log("WARN "+msg);
+  }
+  function error (msg) {
+    if (console.error) console.error(Lprefix+msg);
+    else log("ERR "+msg);
+  }
+
+  this.WebGL = function(options){
+    if ( !(this instanceof arguments.callee) ) return new arguments.callee(options);
+
+    this.canvasId = options.canvas;
+    this.vertexShaderId = options.vertexShader;
+    this.fragmentShaderId = options.fragmentShader;
+    this.vertexPositionAttributeName = options.vertexPositionAttributeName || "a_vertexPosition";
+    this.vertexColorAttributeName = options.vertexColorAttributeName || "a_vertexColor";
+
+    this.update = options.update || function(t){};
+
+    this.initGL();
+    this.initShaders();
+    this.initProgram();
+    this.initUniforms();
+    this.initBuffers();
+    this.render();
+
+  }; 
+
+  WebGL.supported = function () {
+    return !!getWebGLContext(document.createElement("canvas"));
+  };
+
+  WebGL.prototype = {
+    initGL: function() {
+      this.canvas = document.getElementById(this.canvasId);  
+      this.gl = (canvas.getContext("webgl")) ? canvas.getContext("webgl") : canvas.getContext("experimental-webgl");  
+      this.gl.clearColor(1.0, 0.0, 0.0, 1.0); // this is the color  
+      this.gl.enable(this.gl.DEPTH_TEST); //Enable Depth Testing  
+      this.gl.depthFunc(this.gl.LEQUAL); //Set Perspective View  
+      //this.aspectRatio = canvas.width / canvas.height;
+      var w = this.canvas.width, h = this.canvas.height;
+      this.gl.viewport(0, 0, w, h);
+    },
+
+    initShaders: function() {
+      this.vertexShader = GLUtils.loadShaderFromId(this.gl, this.vertexShaderId, this.gl.VERTEX_SHADER);
+      this.fragmentShader = GLUtils.loadShaderFromId(this.gl, this.fragmentShaderId, this.gl.FRAGMENT_SHADER);
+    },
+    
+    initProgram: function() {
+      this.program = GLUtils.loadProgram(this.gl, [this.vertexShader, this.fragmentShader]);
+      this.gl.useProgram(this.program);
+    },
+    
+    initUniforms: function() {      
+      this.vertexPositionAttribute = this.gl.getAttribLocation(this.program, this.vertexPositionAttributeName);  
+      this.gl.enableVertexAttribArray(this.vertexPositionAttribute);  
+
+      //this.texCoordAttribute = this.gl.getAttribLocation(this.program, "a_texCoord");
+      //this.gl.enableVertexAttribArray(this.texCoordAttribute);
+    },
+
+    initBuffers: function() {
+
+      // vertex buffer
+      var buffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+      this.gl.bufferData(
+        this.gl.ARRAY_BUFFER, 
+        new Float32Array([
+            -1.0, -1.0, 
+             1.0, -1.0, 
+            -1.0,  1.0, 
+            -1.0,  1.0, 
+             1.0, -1.0, 
+             1.0,  1.0]), 
+        this.gl.STATIC_DRAW
+      );
+      this.gl.vertexAttribPointer(this.vertexPositionAttribute, 2, this.gl.FLOAT, false, 0, 0);
+    },
+
+    render: function () {
+      this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+    },
+
+    start: function () {
+      var startTime = Date.now();
+      var lastTime = startTime;
+      var self = this;
+      this.running = true;
+      requestAnimationFrame(function loop () {
+        if (this.stopRequest) { // handle stop request
+          this.stopRequest = false;
+          this.running = false;
+          return;
+        }
+        requestAnimationFrame(loop, self.canvas);
+        var t = Date.now()-startTime;
+        var delta = t-lastTime;
+        lastTime = t;
+        self.update(t, delta);
+        self.render();
+      }, self.canvas);
+      return this;
+    },
+
+    /**
+     * Stops the render and update loop.
+     * @public
+     */
+    stop: function () {
+      this.stopRequest = true;
+    }
+  }
+
+  var GLUtils = {
+    loadProgram: function(gl, shaders) {
+      var program = gl.createProgram();
+      shaders.forEach(function (shader) {
+        gl.attachShader(program, shader);
+      });
+      gl.linkProgram(program);
+
+      var linked = gl.getProgramParameter(program, gl.LINK_STATUS);
+      if (!linked) {
+        gl.deleteProgram(program);
+        throw new Error(program+" "+gl.getProgramInfoLog(program));
+      }
+      return program;
+    },
+
+    loadShaderFromId: function(gl, id, shaderType) {
+      return GLUtils.loadShader(gl, document.getElementById(id).innerHTML, shaderType);
+    },
+
+    loadShader: function(gl, shaderSource, shaderType) {
+      var shader = gl.createShader(shaderType);
+      gl.shaderSource(shader, shaderSource);
+      gl.compileShader(shader);
+      var compiled = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+      if (!compiled) {
+        lastError = gl.getShaderInfoLog(shader);
+        var split = lastError.split(":");
+        var col = parseInt(split[1], 10);
+        var line = parseInt(split[2], 10);
+        var s = "";
+        if (!isNaN(col)) {
+          var spaces = ""; for (var i=0; i<col; ++i) spaces+=" ";
+          s = "\n"+spaces+"^";
+        }
+        error(lastError+"\n"+shaderSource.split("\n")[line-1]+s);
+        gl.deleteShader(shader);
+        throw new Error(shader+" "+lastError);
+      }
+      return shader;
+    },
+
+  }
+
+  function getWebGLContext(canvas) {
+    if (!canvas.getContext) return;
+    var names = ["webgl", "experimental-webgl"];
+    for (var i = 0; i < names.length; ++i) {
+      try {
+        var ctx = canvas.getContext(names[i]);
+        if (ctx) return ctx;
+      } catch(e) {}
+    }
+  }
+
+  // http://paulirish.com/2011/requestanimationframe-for-smart-animating/
+  // http://my.opera.com/emoller/blog/2011/12/20/requestanimationframe-for-smart-er-animating
+
+  // requestAnimationFrame polyfill by Erik Möller
+  // fixes from Paul Irish and Tino Zijdel
+
+  (function() {
+      var lastTime = 0;
+      var vendors = ['ms', 'moz', 'webkit', 'o'];
+      for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
+          window.requestAnimationFrame = window[vendors[x]+'RequestAnimationFrame'];
+          window.cancelAnimationFrame = window[vendors[x]+'CancelAnimationFrame'] 
+                                     || window[vendors[x]+'CancelRequestAnimationFrame'];
+      }
+   
+      if (!window.requestAnimationFrame)
+          window.requestAnimationFrame = function(callback, element) {
+              var currTime = new Date().getTime();
+              var timeToCall = Math.max(0, 16 - (currTime - lastTime));
+              var id = window.setTimeout(function() { callback(currTime + timeToCall); }, 
+                timeToCall);
+              lastTime = currTime + timeToCall;
+              return id;
+          };
+   
+      if (!window.cancelAnimationFrame)
+          window.cancelAnimationFrame = function(id) {
+              clearTimeout(id);
+          };
+  }());
+}());
+
+var gl;
+
+function onload() {
+  gl = WebGL({
+    canvas : 'canvas', 
+    vertexShader : 'vertex-shader', 
+    fragmentShader : 'fragment-shader',
+    update : function(t) {
+      var gl = this.gl;
+      this.gl.uniform1f(
+        this.gl.getUniformLocation(this.program, "u_time"), 
+        t
+      );
+
+    }
+  }).start();
+
+}
+
+</script>
+
+
+</head>
+<body onload="onload()">
+
+<canvas id="canvas" style="border: none;" width="600" height="600"></canvas>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+  attribute vec2 a_vertexPosition;  
+
+  void main() {  
+    gl_Position = vec4(a_vertexPosition, 0.0, 1.0);  
+  }  
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+  #ifdef GL_ES
+  precision mediump float;
+  #endif
+
+  #define PI 3.14159265359
+
+  uniform float u_time;
+
+  void main() {  
+    float sz = 600.;
+    vec2 position = gl_FragCoord.xy;
+    vec2 origin = vec2(sz/2., sz/2.);
+    vec2 pos = position - origin;
+    float dist = distance(position, origin);
+    
+    //float angle = asin(pos.y / dist) + PI/2.;
+    //if(pos.x < 0.) angle = 2. * PI - angle;
+
+    float angle = fract((atan(pos.y, pos.x) + PI) / (PI));
+    // x²+y² = A*t
+    float left = pos.x*pos.x + pos.y*pos.y;
+    //float right = atan(pos.y / pos.x)*100.;
+    //float right = u_time/100.;
+    float p = distance(left, 1000.*angle);
+    if(p < 100.)
+      gl_FragColor = vec4( vec3(1.0, 1.0, 1.0), 1.0);  
+    else gl_FragColor = vec4( 0.0, 0.0, 0.0, 1.0);  
+    //float v = (dist + u_time / 1000.) / 10.;
+    
+    //gl_FragColor = vec4(0.0, 0.5+sin(u_time/1000.), 0.0, 1.0);
+    //gl_FragColor = vec4( vec3(sin(v), sin(v), sin(v)), 1.0);
+    //gl_FragColor = vec4( vec3(sin(v), sin(v), sin(v)), 1.0);
+  } 
+</script>
+
+<body>
+</html>

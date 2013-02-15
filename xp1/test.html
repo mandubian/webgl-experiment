@@ -1,0 +1,310 @@
+<html>
+<head>
+<script type="text/javaScript" src="http://greggman.github.com/webgl-fundamentals/webgl/resources/webgl-utils.js"></script> 
+<script>
+  var cube = {
+    rotation : 0.0,
+    vertices : [
+      // Front face
+      -1.0, -1.0,  1.0,
+       1.0, -1.0,  1.0,
+       1.0,  1.0,  1.0,
+      -1.0,  1.0,  1.0,
+       
+      // Back face
+      -1.0, -1.0, -1.0,
+      -1.0,  1.0, -1.0,
+       1.0,  1.0, -1.0,
+       1.0, -1.0, -1.0,
+       
+      // Top face
+      -1.0,  1.0, -1.0,
+      -1.0,  1.0,  1.0,
+       1.0,  1.0,  1.0,
+       1.0,  1.0, -1.0,
+       
+      // Bottom face
+      -1.0, -1.0, -1.0,
+       1.0, -1.0, -1.0,
+       1.0, -1.0,  1.0,
+      -1.0, -1.0,  1.0,
+       
+      // Right face
+       1.0, -1.0, -1.0,
+       1.0,  1.0, -1.0,
+       1.0,  1.0,  1.0,
+       1.0, -1.0,  1.0,
+       
+      // Left face
+      -1.0, -1.0, -1.0,
+      -1.0, -1.0,  1.0,
+      -1.0,  1.0,  1.0,
+      -1.0,  1.0, -1.0
+    ],
+
+    triangles : [
+      0,  1,  2,      0,  2,  3,    // front
+      4,  5,  6,      4,  6,  7,    // back
+      8,  9,  10,     8,  10, 11,   // top
+      12, 13, 14,     12, 14, 15,   // bottom
+      16, 17, 18,     16, 18, 19,   // right
+      20, 21, 22,     20, 22, 23    // left
+    ],
+
+    colors: [
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0,
+
+      0.0, 0.0, 1.0, 1.0,
+      0.0, 1.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0.0, 0.0, 1.0, 1.0
+    ],
+
+    texture : [ //This array is in groups of two, the x and y coordinates (a.k.a U,V) in the texture  
+      //The numbers go from 0.0 to 1.0, One pair for each vertex  
+      //Front  
+      1.0, 1.0,  
+      1.0, 0.0,  
+      0.0, 1.0,  
+      0.0, 0.0,  
+      //Back  
+      0.0, 1.0,  
+      0.0, 0.0,  
+      1.0, 1.0,  
+      1.0, 0.0,  
+      //Right  
+      1.0, 1.0,  
+      1.0, 0.0,  
+      0.0, 1.0,  
+      0.0, 0.0,  
+      //Left  
+      0.0, 1.0,  
+      0.0, 0.0,  
+      1.0, 1.0,  
+      1.0, 0.0,  
+      //Top  
+      1.0, 0.0,  
+      1.0, 1.0,  
+      0.0, 0.0,  
+      0.0, 1.0,  
+      //Bottom  
+      0.0, 0.0,  
+      0.0, 1.0,  
+      1.0, 0.0,  
+      1.0, 1.0  
+    ]
+
+  }
+
+  function buildCube(ctx) {
+    var vertexBuffer = ctx.gl.createBuffer();
+    ctx.gl.bindBuffer(ctx.gl.ARRAY_BUFFER, vertexBuffer);
+    ctx.gl.bufferData(ctx.gl.ARRAY_BUFFER, new Float32Array(cube.vertices), ctx.gl.STATIC_DRAW);
+    ctx.gl.vertexAttribPointer(ctx.vertexPosition, 3, ctx.gl.FLOAT, false, 0, 0);  
+     
+    /*var textureBuffer = ctx.gl.createBuffer();  
+    ctx.gl.bindBuffer(ctx.gl.ARRAY_BUFFER, textureBuffer);  
+    ctx.gl.bufferData(ctx.gl.ARRAY_BUFFER, new Float32Array(cube.texture), ctx.gl.STATIC_DRAW);  
+    ctx.gl.vertexAttribPointer(ctx.vertexTexture, 2, ctx.gl.FLOAT, false, 0, 0);*/
+
+    var colorBuffer = ctx.gl.createBuffer();
+    ctx.gl.bindBuffer(ctx.gl.ARRAY_BUFFER, colorBuffer);
+    ctx.gl.bufferData(ctx.gl.ARRAY_BUFFER, new Float32Array(cube.colors), ctx.gl.STATIC_DRAW);
+    colorBuffer.itemSize = 4;
+    colorBuffer.numItems = 24;
+    ctx.gl.vertexAttribPointer(ctx.vertexColor, colorBuffer.itemSize, ctx.gl.FLOAT, false, 0, 0);
+
+    var triangleBuffer = ctx.gl.createBuffer();  
+    ctx.gl.bindBuffer(ctx.gl.ELEMENT_ARRAY_BUFFER, triangleBuffer);  
+    ctx.gl.bufferData(ctx.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(cube.triangles), ctx.gl.STATIC_DRAW);  
+  }
+
+  function webgl(canvasId, vertexShaderId, fragmentShaderId) {
+    var canvas = document.getElementById(canvasId);  
+    if(!canvas.getContext("webgl") && !canvas.getContext("experimental-webgl"))  
+        alert("Your Browser Doesn't Support Webgl");  
+    else  
+    {  
+        this.gl = (canvas.getContext("webgl")) ? canvas.getContext("webgl") : canvas.getContext("experimental-webgl");  
+        this.gl.clearColor(1.0, 1.0, 1.0, 1.0); // this is the color  
+        this.gl.enable(this.gl.DEPTH_TEST); //Enable Depth Testing  
+        this.gl.depthFunc(this.gl.LEQUAL); //Set Perspective View  
+        this.aspectRatio = canvas.width / canvas.height;  
+
+        //Load Shaders Here  
+        this.vertexShader = createShaderFromScriptElement(this.gl, vertexShaderId);
+        this.fragmentShader = createShaderFromScriptElement(this.gl, fragmentShaderId);
+
+        if(!this.vertexShader || !this.fragmentShader)  
+            alert("Error, Could Not Find Shaders");  
+
+        this.program = createProgram(this.gl, [this.vertexShader, this.fragmentShader]);
+        this.gl.useProgram(this.program);
+
+        this.vertexPosition = this.gl.getAttribLocation(this.program, "a_vertexPosition");  
+        this.gl.enableVertexAttribArray(this.vertexPosition);  
+
+        this.vertexColor = this.gl.getAttribLocation(this.program, "a_vertexColor");  
+        this.gl.enableVertexAttribArray(this.vertexColor);  
+
+
+        this.draw = function() {
+          //Generate The Perspective Matrix  
+          var perspectiveMatrix = makePerspective(45, this.aspectRatio, 1, 10000.0);  
+          var transformMatrix = makeTransform(cube);  
+          var pmatrix = this.gl.getUniformLocation(this.program, "u_perspectiveMatrix");  
+          this.gl.uniformMatrix4fv(pmatrix, false, new Float32Array(perspectiveMatrix));  
+          var tmatrix = this.gl.getUniformLocation(this.program, "u_transformationMatrix");  
+          this.gl.uniformMatrix4fv(tmatrix, false, new Float32Array(transformMatrix));
+          buildCube(this);  
+          //Set slot 0 as the active Texture  
+          //this.gl.activeTexture(this.gl.TEXTURE0);  
+          //Load in the Texture To Memory  
+          //this.gl.bindTexture(this.gl.TEXTURE_2D, texture);  
+          //Update The Texture Sampler in the fragment shader to use slot 0  
+          //this.gl.uniform1i(this.gl.getUniformLocation(this.program, "u_sampler"), 0);  
+          //Set The Perspective and Transformation Matrices  
+
+          this.gl.drawElements(this.gl.TRIANGLES, cube.triangles.length, this.gl.UNSIGNED_SHORT, 0);  
+        }        
+
+        /*this.loadTexture = function(img){
+          //Create a new Texture and Assign it as the active one
+          var tempTex = this.gl.createTexture();
+          this.gl.bindTexture(this.gl.TEXTURE_2D, tempTex);
+          //Flip Positive Y (Optional)
+          this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+          //Load in The Image
+          this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, img);
+          //Setup Scaling properties
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR_MIPMAP_NEAREST);
+          this.gl.generateMipmap(this.gl.TEXTURE_2D);
+          //Unbind the texture and return it.
+          this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+          return tempTex;
+        };*/
+
+        
+    }
+
+
+  }
+
+  function makePerspective(fov, aspectRatio, closest, farest){
+    var YLimit = closest * Math.tan(fov * Math.PI / 360);
+    var A = -( farest + closest ) / ( farest - closest );
+    var B = -2 * farest * closest / ( farest - closest );
+    var C = (2 * closest) / ( (YLimit * aspectRatio) * 2 );
+    var D = (2 * closest) / ( YLimit * 2 );
+    return [
+      C, 0, 0, 0,
+      0, D, 0, 0,
+      0, 0, A, -1,
+      0, 0, B, 0
+    ];
+  }
+
+  function makeTransform(object){
+    var y = object.rotation * (Math.PI / 180.0);
+    var A = Math.cos(y);
+    var B = -1 * Math.sin(y);
+    var C = Math.sin(y);
+    var D = Math.cos(y);
+    object.rotation += .3;
+    return [
+      A, 0, B, 0,
+      0, 1, 0, 0,
+      C, 0, D, 0,
+      0, 0, -6, 1
+    ];
+  }
+
+  var gl;
+  var textureImage;
+
+  function onload() {
+    gl = new webgl('canvas', 'vertex-shader', 'fragment-shader');
+
+    /*textureImage = new Image();  
+    textureImage.onload = function(){  
+      texture = gl.loadTexture(textureImage);  
+      gl.draw(texture);  
+    };
+    textureImage.src = "Texture.png";*/
+
+    //gl.draw();
+    setInterval(update, 33);  
+  }
+
+  function update() {
+    gl.gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.draw();  
+  }
+
+</script>
+
+
+</head>
+<body onload="onload()">
+
+<canvas id="canvas" style="border: none;" width="300" height="300"></canvas>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+  attribute highp vec3 a_vertexPosition;  
+  //attribute highp vec2 a_textureCoord; 
+
+  attribute vec4 a_vertexColor;
+
+  uniform highp mat4 u_transformationMatrix;  
+  uniform highp mat4 u_perspectiveMatrix;  
+  //varying highp vec2 v_textureCoord;  
+
+  varying vec4 v_vertexColor;
+
+  void main() {  
+    gl_Position = u_perspectiveMatrix * u_transformationMatrix * vec4(a_vertexPosition, 1.0);  
+    //v_textureCoord = a_textureCoord;  
+    v_vertexColor = a_vertexColor;
+  }  
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+  //varying highp vec2 v_textureCoord;  
+  //uniform sampler2D u_sampler;  
+  precision mediump float;
+
+  varying vec4 v_vertexColor;
+
+  void main() {  
+    //highp vec4 texelColor = texture2D(u_sampler, vec2(v_textureCoord.s, v_textureCoord.t));  
+    //gl_FragColor = texelColor;  
+    gl_FragColor = v_vertexColor;
+  } 
+</script>
+
+<body>
+</html>
